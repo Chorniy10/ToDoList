@@ -1,0 +1,169 @@
+﻿@using ToDoList.Domain.Enum
+@{
+    ViewData["Title"] = "Home Page";
+}
+
+<h4 class="mb-3 text-muted">Створення задачі</h4>
+<form id="createTaskForm">
+    <div class="mb-3">
+        <label class="form-label">Назва задачі</label>
+        <input name="name" type="text" class="form-control"/>
+    </div>
+    <label class="form-label">Пріоритет задачі</label>
+    <select name="priority" class="form-select mb-3" asp-items="Html.GetEnumSelectList<Priority>()"></select>
+        <div class="mb-3">
+            <label class="form-label">Опис задачі</label>
+            <textarea name="description" type="text" class="form-control" rows="3"></textarea>
+        </div>
+        <button id="createTask" class="btn btn-primary">Створити</button>
+</form>
+
+<br />
+
+<div class="row">
+    <div class="form-group col-md-6">
+        <label class="col-form-label">Назва</label>
+        <input name="nameTask" type="text" class="form-control" />
+    </div>
+    <div class="form-group col-md-6">
+        <label class="col-form-label">Пріоритет</label>
+        <select id="prioritySearch" class="form-control mb-3" asp-items="Html.GetEnumSelectList<Priority>()">
+            <option value="Всі"></option>
+        </select>
+    </div>
+</div>
+
+<br/>
+
+<table class="table table-dark table-hover" id="taskTableId">
+    <thead>
+    <tr>
+        <th>Назва</th>
+        <th>Складність</th>
+        <th>Опис</th>
+        <th>Готовність</th>
+        <th>Дія</th>
+    </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+@section Scripts
+{
+    <script type="text/javascript" src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script type="text/javascript" src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+
+        const swallWithBootstrapButtons = Swal.mixin({
+            customClass: {
+                confirmButton: 'btn btn-success';
+            },
+            buttonsStyling: false
+        })
+
+        let dataTable = $('#taskTableId').DataTable({
+            info: false,
+            serverSide: true,
+            searching: false,
+            paging: true,
+            sorting: false,
+            ajax: {
+                url: "@Url.Action("TaskHandler")",
+                method: 'POST',
+                data: {
+                    Name: $('input[name="nameTask"]').val(),
+                    Priority: $('#prioritySearch option:selected').val()
+                }
+            },
+            columns: [
+                { data: 'name' },
+                { data: 'priority' },
+                { data: 'description' },
+                { data: 'isDone' },
+                {
+                    data: null,
+                    sortable: false,
+                    render: function (data, type) {
+                        return '<button class="btn btn-success btn-sm center-block">Виконати</button>'
+                    }
+                }
+            ],
+            createdRow: function (nRow, data) {
+                var handlerComplete = function () {
+                    swalWithBootstrapButtons.fire({
+                        title: "Ви впевнені?",
+                        icon: "warning",
+                        confirmButtonText: "Так",
+                        reverseButtons: true
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            $.ajax({
+                                type: 'POST',
+                                url: '@Url.Action("EndTask")',
+                                data: { id: data.id },
+                                success: function (response) {
+                                    Swal.fire({
+                                        title: 'Інформація',
+                                        text: response.description,
+                                        icon: 'success',
+                                        confirmButtonText: 'OK'
+                                    })
+                                    dataTable.draw();
+                                },
+                                error: function (response) {
+                                    Swal.fire({
+                                        title: 'Інформація',
+                                        text: response.responseJSON.description,
+                                        icon: 'error',
+                                        confirmButtonText: 'OK'
+                                    })
+                                }
+                            })
+                        }
+                    });
+                }
+
+                for (var i = 0; i < dataTable.columns().header().length - 1; i++) {
+                    $('td', nRow).eq(i).css('cursor', 'pointer');
+
+                    $('td', nRow).eq(i).on('click', null);
+                }
+                $('td button', nRow).on('click', handlerComplete);
+            }
+        });
+
+
+        $('input[name="nameTask"]').on('change', function () {
+            dataTable.draw();
+        })
+
+        $('#prioritySearch').on('change', function () {
+            dataTable.draw();
+        })
+
+        $('#createTask').on('click', function (e) {
+            e.preventDefault();
+            $.ajax({
+                type: 'POST',
+                url: '@Url.Action("Index","Task")',
+                data: $('#createTaskForm').serialize(),
+                success: function (response) {
+                    Swal.fire({
+                        title: 'Інформація',
+                        text: response.description,
+                        icon: 'success',
+                        confirmButtonText: 'OK'
+                    })
+                },
+                error: function (response) {
+                    Swal.fire({
+                        title: 'Інформація',
+                        text: response.responseJSON.description,
+                        icon: 'error',
+                        confirmButtonText: 'OK'
+                    })
+                }
+            })
+        });
+    </script>
+}
